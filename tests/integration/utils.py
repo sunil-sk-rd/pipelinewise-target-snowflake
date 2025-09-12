@@ -15,10 +15,13 @@ def get_db_config():
     use_browser_auth = os.environ.get("TARGET_SNOWFLAKE_USE_BROWSER_AUTHENTICATION")
 
     if private_key:
+        print("[DEBUG] Using private_key from env.")
         config["private_key"] = private_key
     if private_key_path:
+        print(f"[DEBUG] Using private_key_path from env: {private_key_path}")
         config["private_key_path"] = private_key_path
     if use_browser_auth:
+        print(f"[DEBUG] Using browser authentication: {use_browser_auth}")
         # Convert to boolean if set to 'true' (case-insensitive)
         config["use_browser_authentication"] = use_browser_auth.lower() == "true"
 
