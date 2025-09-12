@@ -10,13 +10,18 @@ def get_db_config():
     config = {}
     # Optional authentication methods for Snowflake
     # These allow tests to use private key or browser auth if set in env
+    import base64
     private_key = os.environ.get("TARGET_SNOWFLAKE_PRIVATE_KEY")
+    private_key_b64 = os.environ.get("TARGET_SNOWFLAKE_PRIVATE_KEY_BASE64")
     private_key_path = os.environ.get("TARGET_SNOWFLAKE_PRIVATE_KEY_PATH")
     use_browser_auth = os.environ.get("TARGET_SNOWFLAKE_USE_BROWSER_AUTHENTICATION")
 
     if private_key:
         print("[DEBUG] Using private_key from env.")
         config["private_key"] = private_key
+    elif private_key_b64:
+        print("[DEBUG] Using base64-encoded private_key from env.")
+        config["private_key"] = base64.b64decode(private_key_b64).decode("utf-8")
     if private_key_path:
         print(f"[DEBUG] Using private_key_path from env: {private_key_path}")
         config["private_key_path"] = private_key_path

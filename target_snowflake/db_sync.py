@@ -252,6 +252,7 @@ class DbSync:
         table_cache=None,
         file_format_type=None,
     ):
+        print("[DEBUG] DbSync received config:", connection_config)
         """
         connection_config:      Snowflake connection details
 
