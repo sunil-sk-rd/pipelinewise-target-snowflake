@@ -31,7 +31,7 @@ setup(
         "snowflake-sqlalchemy>=1.4.5,<2.0.0",
         "numpy==1.26.4",
         "pandas>=1.5.3,<2.1.0",
-        "cryptography=*",
+        "cryptography>=3.3.2",
     ],
     extras_require={
         "test": [
