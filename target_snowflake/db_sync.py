@@ -74,6 +74,7 @@ def validate_config(config):
 
     # Check for at least one valid auth method
     if not any(config.get(k) for k in auth_keys):
+        print(config)
         errors.append(
             "Authentication method missing: provide one of 'password', 'private_key', 'private_key_path', or set 'use_browser_authentication' to true."
         )
