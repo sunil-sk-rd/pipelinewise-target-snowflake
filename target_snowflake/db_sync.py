@@ -234,12 +234,15 @@ class DbSync:
         config_auth_methods = [
             x for x in valid_auth_methods if self.connection_config.get(x)
         ]
-        if len(config_auth_methods) != 1:
+        if len(config_auth_methods) == 0:
             raise Exception(
                 "Neither password nor private key was provided for authentication. "
                 "For password-less browser authentication via SSO, set use_browser_authentication config option to True."
             )
-        if config_auth_methods[0] in ["private_key", "private_key_path"]:
+        if (
+            "private_key" in config_auth_methods
+            or "private_key_path" in config_auth_methods
+        ):
             return SnowflakeAuthMethod.KEY_PAIR
         return SnowflakeAuthMethod.PASSWORD
 
