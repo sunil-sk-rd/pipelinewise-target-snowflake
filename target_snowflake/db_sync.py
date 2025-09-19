@@ -202,19 +202,19 @@ class SnowflakeAuthMethod(Enum):
     KEY_PAIR = 3
 
 
-def load_private_key_from_config(config):
-    """Load and return private key bytes from config (file or string)."""
-    key_path = config.get("private_key_path")
-    key_str = config.get("private_key")
-    passphrase = config.get("private_key_passphrase")
-    if key_path:
-        with open(key_path, "rb") as key_file:
-            key_data = key_file.read()
-    elif key_str:
-        key_data = key_str
-    else:
-        raise Exception("No private key provided for key pair authentication.")
-    return key_data
+# def load_private_key_from_config(config):
+#     """Load and return private key bytes from config (file or string)."""
+#     key_path = config.get("private_key_path")
+#     key_str = config.get("private_key")
+#     passphrase = config.get("private_key_passphrase")
+#     if key_path:
+#         with open(key_path, "rb") as key_file:
+#             key_data = key_file.read()
+#     elif key_str:
+#         key_data = key_str
+#     else:
+#         raise Exception("No private key provided for key pair authentication.")
+#     return key_data
 
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
@@ -416,10 +416,7 @@ class DbSync:
         if auth_method == SnowflakeAuthMethod.BROWSER:
             connect_args["authenticator"] = "externalbrowser"
         elif auth_method == SnowflakeAuthMethod.KEY_PAIR:
-            connect_args["private_key"] = load_private_key_from_config(
-                self.connection_config
-            )
-        elif auth_method == SnowflakeAuthMethod.PASSWORD:
+            connect_args["private_key"] = self.connection_config["private_key"]
             connect_args["password"] = self.connection_config["password"]
         else:
             raise Exception("Invalid authentication method for Snowflake connection.")
