@@ -2,7 +2,6 @@ import json
 import sys
 import snowflake.connector
 from enum import Enum
-from cryptography.hazmat.primitives import serialization
 import re
 import time
 
@@ -212,18 +211,10 @@ def load_private_key_from_config(config):
         with open(key_path, "rb") as key_file:
             key_data = key_file.read()
     elif key_str:
-        key_data = key_str.encode()
+        key_data = key_str
     else:
         raise Exception("No private key provided for key pair authentication.")
-    p_key = serialization.load_pem_private_key(
-        key_data,
-        password=passphrase.encode() if passphrase else None,
-    )
-    return p_key.private_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
+    return key_data
 
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
