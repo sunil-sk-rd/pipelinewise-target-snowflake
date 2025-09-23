@@ -212,6 +212,25 @@ class SnowflakeAuthMethod(Enum):
 
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
 class DbSync:
+    def __init__(
+        self,
+        connection_config,
+        stream_schema_message=None,
+        flatten_schema=None,
+        data_flattening_max_level=None,
+        table_cache=None,
+        grantees=None,
+        upload_client=None,
+    ):
+        self.connection_config = connection_config
+        self.stream_schema_message = stream_schema_message
+        self.flatten_schema = flatten_schema
+        self.data_flattening_max_level = data_flattening_max_level
+        self.table_cache = table_cache
+        self.grantees = grantees
+        self.upload_client = upload_client
+        self.logger = get_logger()  # If you use Singer logger
+
     def _get_auth_method(self):
         # Only key pair authentication is supported
         valid_auth_methods = ["private_key", "private_key_path"]
