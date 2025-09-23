@@ -25,13 +25,8 @@ def validate_config(config):
     """Validate configuration"""
     errors = []
 
-    # Auth keys: at least one must be present
-    auth_keys = [
-        "password",
-        "private_key",
-        "private_key_path",
-        "use_browser_authentication",
-    ]
+    # Only key pair authentication is supported
+    auth_keys = ["private_key", "private_key_path"]
 
     s3_required_config_keys = [
         "account",
@@ -62,8 +57,8 @@ def validate_config(config):
     else:
         errors.append(
             "Only one of 's3_bucket' or 'stage' keys defined in config. "
-            "Use both of them if you want to use an external stage when loading data into snowflake "
-            "or don't use any of them if you want ot use table stages."
+            "Use both of them if you want to use an external stage when loading data into Snowflake, "
+            "or don't use any of them if you want to use table stages."
         )
 
     # Check if mandatory keys exist (excluding auth keys)
@@ -71,11 +66,11 @@ def validate_config(config):
         if k not in auth_keys and not config.get(k, None):
             errors.append(f"Required key is missing from config: [{k}]")
 
-    # Check for at least one valid auth method
+    # Check for key pair authentication
     if not any(config.get(k) for k in auth_keys):
         print(config)
         errors.append(
-            "Authentication method missing: provide one of 'password', 'private_key', 'private_key_path', or set 'use_browser_authentication' to true."
+            "Key pair authentication is mandatory: provide 'private_key' (base64 DER string) or 'private_key_path'."
         )
 
     # Check target schema config
@@ -197,9 +192,7 @@ def create_query_tag(
 
 
 class SnowflakeAuthMethod(Enum):
-    BROWSER = 1
-    PASSWORD = 2
-    KEY_PAIR = 3
+    KEY_PAIR = 1
 
 
 # def load_private_key_from_config(config):
@@ -220,181 +213,33 @@ class SnowflakeAuthMethod(Enum):
 # pylint: disable=too-many-public-methods,too-many-instance-attributes
 class DbSync:
     def _get_auth_method(self):
-        if self.connection_config.get("use_browser_authentication"):
-            return SnowflakeAuthMethod.BROWSER
-        valid_auth_methods = ["private_key", "private_key_path", "password"]
+        # Only key pair authentication is supported
+        valid_auth_methods = ["private_key", "private_key_path"]
         config_auth_methods = [
             x for x in valid_auth_methods if self.connection_config.get(x)
         ]
         if len(config_auth_methods) == 0:
             raise Exception(
-                "Neither password nor private key was provided for authentication. "
-                "For password-less browser authentication via SSO, set use_browser_authentication config option to True."
+                "Key pair authentication is mandatory: provide 'private_key' (base64 DER string) or 'private_key_path'."
             )
-        if (
-            "private_key" in config_auth_methods
-            or "private_key_path" in config_auth_methods
-        ):
-            return SnowflakeAuthMethod.KEY_PAIR
-        return SnowflakeAuthMethod.PASSWORD
-
-    """DbSync class"""
-
-    def __init__(
-        self,
-        connection_config,
-        stream_schema_message=None,
-        table_cache=None,
-        file_format_type=None,
-    ):
-        print("[DEBUG] DbSync received config:", connection_config)
-        """
-        connection_config:      Snowflake connection details
-
-        stream_schema_message:  An instance of the DbSync class is typically used to load
-                                data only from a certain singer tap stream.
-
-                                The stream_schema_message holds the destination schema
-                                name and the JSON schema that will be used to
-                                validate every RECORDS messages that comes from the stream.
-                                Schema validation happening before creating CSV and before
-                                uploading data into Snowflake.
-
-                                If stream_schema_message is not defined that we can use
-                                the DbSync instance as a generic purpose connection to
-                                Snowflake and can run individual queries. For example
-                                collecting catalog informations from Snowflake for caching
-                                purposes.
-        """
-        self.connection_config = connection_config
-        self.stream_schema_message = stream_schema_message
-        self.table_cache = table_cache
-
-        # logger to be used across the class's methods
-        self.logger = get_logger("target_snowflake")
-
-        # Validate connection configuration
-        config_errors = validate_config(connection_config)
-
-        # Exit if config has errors
-        if len(config_errors) > 0:
-            self.logger.error(
-                "Invalid configuration:\n   * %s", "\n   * ".join(config_errors)
-            )
-            sys.exit(1)
-
-        if self.connection_config.get("stage", None):
-            stage = stream_utils.stream_name_to_dict(
-                self.connection_config["stage"], separator="."
-            )
-            if not stage["schema_name"]:
-                self.logger.error(
-                    "The named external stage object in config has to use the <schema>.<stage_name> format."
-                )
-                sys.exit(1)
-
-        self.schema_name = None
-        self.grantees = None
-        self.file_format = FileFormat(
-            self.connection_config["file_format"], self.query, file_format_type
-        )
-
-        if (
-            not self.connection_config.get("stage")
-            and self.file_format.file_format_type == FileFormatTypes.PARQUET
-        ):
-            self.logger.error(
-                "Table stages with Parquet file format is not supported. "
-                "Use named stages with Parquet file format or table stages with CSV files format"
-            )
-            sys.exit(1)
-
-        # Init stream schema pylint: disable=line-too-long
-        if self.stream_schema_message is not None:
-            #  Define target schema name.
-            #  --------------------------
-            #  Target schema name can be defined in multiple ways:
-            #
-            #   1: 'default_target_schema' key  : Target schema is the same for every incoming stream if
-            #                                     not specified explicitly for a given stream in
-            #                                     the `schema_mapping` object
-            #   2: 'schema_mapping' key         : Target schema defined explicitly for a given stream.
-            #                                     Example config.json:
-            #                                           "schema_mapping": {
-            #                                               "my_tap_stream_id": {
-            #                                                   "target_schema": "my_snowflake_schema",
-            #                                                   "target_schema_select_permissions": [ "role_with_select_privs" ]
-            #                                               }
-            #                                           }
-            config_default_target_schema = self.connection_config.get(
-                "default_target_schema", ""
-            ).strip()
-            config_schema_mapping = self.connection_config.get("schema_mapping", {})
-
-            stream_name = stream_schema_message["stream"]
-            stream_schema_name = stream_utils.stream_name_to_dict(stream_name)[
-                "schema_name"
-            ]
-            if config_schema_mapping and stream_schema_name in config_schema_mapping:
-                self.schema_name = config_schema_mapping[stream_schema_name].get(
-                    "target_schema"
-                )
-            elif config_default_target_schema:
-                self.schema_name = config_default_target_schema
-
-            if not self.schema_name:
-                raise Exception(
-                    "Target schema name not defined in config. "
-                    "Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines "
-                    f"target schema for {stream_name} stream."
-                )
-
-            #  Define grantees
-            #  ---------------
-            #  Grantees can be defined in multiple ways:
-            #
-            #   1: 'default_target_schema_select_permissions' key  : USAGE and SELECT privileges will be granted on every table to a given role
-            #                                                       for every incoming stream if not specified explicitly
-            #                                                       in the `schema_mapping` object
-            #   2: 'target_schema_select_permissions' key          : Roles to grant USAGE and SELECT privileges defined explicitly
-            #                                                       for a given stream.
-            #                                                       Example config.json:
-            #                                                           "schema_mapping": {
-            #                                                               "my_tap_stream_id": {
-            #                                                                   "target_schema": "my_snowflake_schema",
-            #                                                                   "target_schema_select_permissions": [ "role_with_select_privs" ]
-            #                                                               }
-            #                                                           }
-            self.grantees = self.connection_config.get(
-                "default_target_schema_select_permissions"
-            )
-            if config_schema_mapping and stream_schema_name in config_schema_mapping:
-                self.grantees = config_schema_mapping[stream_schema_name].get(
-                    "target_schema_select_permissions", self.grantees
-                )
-
-            self.data_flattening_max_level = self.connection_config.get(
-                "data_flattening_max_level", 0
-            )
-            self.flatten_schema = flattening.flatten_schema(
-                stream_schema_message["schema"],
-                max_level=self.data_flattening_max_level,
-            )
-
-        # Use external stage
-        if connection_config.get("s3_bucket", None):
-            self.upload_client = S3UploadClient(connection_config)
-        # Use table stage
-        else:
-            self.upload_client = SnowflakeUploadClient(connection_config, self)
+        return SnowflakeAuthMethod.KEY_PAIR
 
     def open_connection(self):
-        """Open snowflake connection with robust authentication."""
+        """Open snowflake connection with key pair authentication only."""
         stream = None
         if self.stream_schema_message:
             stream = self.stream_schema_message["stream"]
 
-        auth_method = self._get_auth_method()
+        # Validate key pair authentication
+        valid_auth_methods = ["private_key", "private_key_path"]
+        config_auth_methods = [
+            x for x in valid_auth_methods if self.connection_config.get(x)
+        ]
+        if len(config_auth_methods) == 0:
+            raise Exception(
+                "Key pair authentication is mandatory: provide 'private_key' (base64 DER string) or 'private_key_path'."
+            )
+
         connect_args = {
             "user": self.connection_config["user"],
             "account": self.connection_config["account"],
@@ -413,13 +258,9 @@ class DbSync:
             },
         }
 
-        if auth_method == SnowflakeAuthMethod.BROWSER:
-            connect_args["authenticator"] = "externalbrowser"
-        elif auth_method == SnowflakeAuthMethod.KEY_PAIR:
-            connect_args["private_key"] = self.connection_config["private_key"]
-            connect_args["password"] = self.connection_config["password"]
-        else:
-            raise Exception("Invalid authentication method for Snowflake connection.")
+        # Only key pair authentication
+        connect_args["private_key"] = self.connection_config.get("private_key")
+        # If you support private_key_path, you may need to load the key from file here
 
         return snowflake.connector.connect(**connect_args)
 
