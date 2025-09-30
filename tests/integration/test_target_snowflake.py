@@ -38,6 +38,7 @@ class TestIntegration(unittest.TestCase):
 
     def setUp(self):
         self.config = test_utils.get_test_config()
+        print("[DEBUG] Snowflake config for test:", self.config)
         self.snowflake = DbSync(self.config)
 
         # Drop target schema

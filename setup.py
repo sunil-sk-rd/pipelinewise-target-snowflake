@@ -24,13 +24,14 @@ setup(
     python_requires=">=3.9",
     install_requires=[
         "pipelinewise-singer-python==1.*",
-        "snowflake-connector-python[pandas]==3.3.1",
+        "snowflake-connector-python[pandas]==3.13.0",
         "inflection==0.5.1",
         "joblib==1.2.0",
         "boto3==1.28.20",
         "snowflake-sqlalchemy>=1.4.5,<2.0.0",
         "numpy==1.26.4",
         "pandas>=1.5.3,<2.1.0",
+        "cryptography>=3.3.2",
     ],
     extras_require={
         "test": [
